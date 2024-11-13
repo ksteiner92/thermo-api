@@ -1,0 +1,14 @@
+{
+  "entryFile": "src/app.ts",
+  "noImplicitAdditionalProperties": "throw-on-extras",
+  "controllerPathGlobs": ["src/api/controller/**/*Controller.ts"],
+  "spec": {
+    "outputDirectory": "build",
+    "specVersion": 3
+  },
+  "routes": {
+    "routesDir": "./src/api",
+    "middleware": "koa",
+    "iocModule": "./src/ioc/tsyringeTsoaIocContainer"
+  }
+}
