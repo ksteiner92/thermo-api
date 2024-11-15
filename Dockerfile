@@ -4,8 +4,8 @@ FROM node:18-alpine AS builder
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json to install dependencies
-COPY package.json package-lock.json ./
+# Copy package.json and to install dependencies
+COPY package.json ./
 
 # Install only the production dependencies initially
 RUN npm install --production
