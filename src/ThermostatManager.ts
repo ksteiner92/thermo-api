@@ -323,8 +323,24 @@ export class ThermostatManager {
     }
   }
 
-  private async updateMode(deviceId: string, thermostatUpdate: UpdateModeRequest): Promise<void> {
-    if (this.lastThermostatUpdate <= Date.now() - this.maxThermostatUpdateFrequency) {
+  private async updateMode(
+    deviceId: string,
+    thermostatUpdate: UpdateModeRequest,
+  ): Promise<void> {
+    logger.info(
+      {
+        deviceId,
+        thermostatUpdate,
+        lastThermostatUpdate: this.lastThermostatUpdate,
+        maxThermostatUpdateFrequency: this.maxThermostatUpdateFrequency,
+        now: Date.now(),
+      },
+      "Checkin if can update thermostat mode",
+    );
+    if (
+      this.lastThermostatUpdate <=
+      Date.now() - this.maxThermostatUpdateFrequency
+    ) {
       logger.info({ thermostatUpdate }, "Updating thermostat mode");
       await this.daikinClient.updateMode(deviceId, thermostatUpdate);
       this.lastThermostatUpdate = Date.now();
