@@ -20,6 +20,8 @@ services:
       - WS_UPDATE_INTERVAL_MS=10000
       # The interval for which the thermostat information are updated.
       - UPDATE_THERMOSTAT_INTERVAL_MS=30000
+      # How often the thermostat mode can be updated
+      - MAX_THERMOSTAT_UPDATE_FREQUENCY_MS = 30000
       # The interval for which the temperature controller is executed and potentially
       # makes adjustments to the thermostat temperature in order to reach the set target temperature.
       - TEMPERATURE_CONTROLLER_INTERVAL_MS=10000

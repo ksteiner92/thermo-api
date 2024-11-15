@@ -54,6 +54,9 @@ export class ThermostatManager {
   private readonly thermostatAdjustmentIncrement: number = parseFloat(
     process.env.THERMOSTAT_ADJUSTMENT_INCREMENT ?? "",
   );
+  private readonly maxThermostatUpdateFrequency: number = parseInt(
+    process.env.MAX_THERMOSTAT_UPDATE_FREQUENCY_MS ?? "",
+  );
   private readonly wss: WebSocketServer;
   private readonly stateFilePath: string;
   private deviceId: string | undefined;
@@ -61,6 +64,7 @@ export class ThermostatManager {
   private initialDevice: Device | undefined;
   private running: boolean = true;
   private state: ThermostatState;
+  private lastThermostatUpdate: number = 0;
 
   public constructor(
     @inject("DaikinClient") private readonly daikinClient: DaikinClient,
@@ -211,8 +215,7 @@ export class ThermostatManager {
         heatSetpoint: thermostatSetPoint - device.setpointDelta,
       };
       if (thermostatUpdate.coolSetpoint !== device.coolSetpoint) {
-        logger.info({ thermostatUpdate }, "Updating thermostat mode to cool");
-        await this.daikinClient.updateMode(device.id, thermostatUpdate);
+        await this.updateMode(device.id, thermostatUpdate);
       } else {
         logger.info({ thermostatUpdate }, "Thermostat already updated");
       }
@@ -247,8 +250,7 @@ export class ThermostatManager {
         coolSetpoint: thermostatSetPoint + device.setpointDelta,
       };
       if (thermostatUpdate.heatSetpoint !== device.heatSetpoint) {
-        logger.info({ thermostatUpdate }, "Updating thermostat mode to heat");
-        await this.daikinClient.updateMode(device.id, thermostatUpdate);
+        await this.updateMode(device.id, thermostatUpdate);
       } else {
         logger.info({ thermostatUpdate }, "Thermostat already updated");
       }
@@ -285,8 +287,7 @@ export class ThermostatManager {
           heatSetpoint: thermostatSetPoint - device.setpointDelta,
         };
         if (thermostatUpdate.coolSetpoint !== device.coolSetpoint) {
-          logger.info({ thermostatUpdate }, "Updating thermostat mode to cool");
-          await this.daikinClient.updateMode(device.id, thermostatUpdate);
+          await this.updateMode(device.id, thermostatUpdate);
         } else {
           logger.info({ thermostatUpdate }, "Thermostat already updated");
         }
@@ -310,8 +311,7 @@ export class ThermostatManager {
           coolSetpoint: thermostatSetPoint + device.setpointDelta,
         };
         if (thermostatUpdate.heatSetpoint !== device.heatSetpoint) {
-          logger.info({ thermostatUpdate }, "Updating thermostat mode to heat");
-          await this.daikinClient.updateMode(device.id, thermostatUpdate);
+          await this.updateMode(device.id, thermostatUpdate);
         } else {
           logger.info({ thermostatUpdate }, "Thermostat already updated");
         }
@@ -320,6 +320,14 @@ export class ThermostatManager {
       }
     } else {
       logger.info("Thermostat already in idle mode");
+    }
+  }
+
+  private async updateMode(deviceId: string, thermostatUpdate: UpdateModeRequest): Promise<void> {
+    if (this.lastThermostatUpdate <= Date.now() - this.maxThermostatUpdateFrequency) {
+      logger.info({ thermostatUpdate }, "Updating thermostat mode");
+      await this.daikinClient.updateMode(deviceId, thermostatUpdate);
+      this.lastThermostatUpdate = Date.now();
     }
   }
 
