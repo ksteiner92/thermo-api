@@ -26,6 +26,7 @@ export function registerTypes(): void {
     "sensorAxios",
     axios.create({
       baseURL: SensorClient.BASE_URL,
+      timeout: 10000,
     }),
   );
 }
