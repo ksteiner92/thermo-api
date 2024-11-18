@@ -116,7 +116,7 @@ export class ThermostatManager {
   }
 
   public static getInstance(): ThermostatManager {
-    return container.resolve(ThermostatManager);
+    return container.resolve("ThermostatManager");
   }
 
   public async start(): Promise<void> {
@@ -163,7 +163,7 @@ export class ThermostatManager {
         targetTemperature: this.state.targetTemperature,
         highestTemperature: this.device.setpointMaximum,
         lowestTemperature: this.device.setpointMinimum,
-        delta: this.temperatureUncertainty,
+        temperatureUncertainty: this.temperatureUncertainty,
       };
     } else {
       throw new ThermostatManagerError(

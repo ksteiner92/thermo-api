@@ -1,20 +1,12 @@
 import axios from "axios";
-import { container, Lifecycle } from "tsyringe";
+import { container } from "tsyringe";
 import { DaikinClient } from "../client/daikin/DaikinClient";
 import { ThermostatManager } from "../ThermostatManager";
 import { SensorClient } from "../client/sensor/SensorClient";
 
 export function registerTypes(): void {
-  container.register(
-    "DaikinClient",
-    { useClass: DaikinClient },
-    { lifecycle: Lifecycle.Singleton },
-  );
-  container.register(
-    "ThermostatManager",
-    { useClass: ThermostatManager },
-    { lifecycle: Lifecycle.Singleton },
-  );
+  container.registerSingleton("DaikinClient", DaikinClient);
+  container.registerSingleton("ThermostatManager", ThermostatManager);
   container.register("SensorClient", { useClass: SensorClient });
   container.registerInstance(
     "integratorToken",

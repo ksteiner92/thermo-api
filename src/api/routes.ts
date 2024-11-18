@@ -4,6 +4,8 @@
 import { TsoaRoute, fetchMiddlewares, KoaTemplateService } from '@tsoa/runtime';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ThermostatController } from './controller/ThermostatController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { SensorController } from './controller/SensorController';
 import { iocContainer } from './../ioc/tsyringeTsoaIocContainer';
 import type { IocContainer, IocContainerFactory } from '@tsoa/runtime';
 import type { Context, Next, Middleware, Request as KRequest, Response as KResponse } from 'koa';
@@ -13,21 +15,21 @@ import type * as KoaRouter from '@koa/router';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 
 const models: TsoaRoute.Models = {
-    "UpdateTemperature": {
-        "dataType": "refObject",
-        "properties": {
-            "temperature": {"dataType":"double","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ThermostatInfo": {
         "dataType": "refObject",
         "properties": {
             "targetTemperature": {"dataType":"double","required":true},
+            "temperatureUncertainty": {"dataType":"double","required":true},
             "lowestTemperature": {"dataType":"double","required":true},
             "highestTemperature": {"dataType":"double","required":true},
-            "delta": {"dataType":"double","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "UpdateTemperature": {
+        "dataType": "refObject",
+        "properties": {
+            "temperature": {"dataType":"double","required":true},
         },
         "additionalProperties": false,
     },
@@ -124,11 +126,11 @@ export function RegisterRoutes(router: KoaRouter) {
             });
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-        router.get('/v1/thermostat',
+        router.put('/v1/thermostat/enable',
             ...(fetchMiddlewares<Middleware>(ThermostatController)),
-            ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.getMeasurement)),
+            ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.enable)),
 
-            async function ThermostatController_getMeasurement(context: Context, next: Next) {
+            async function ThermostatController_enable(context: Context, next: Next) {
             const args: Record<string, TsoaRoute.ParameterSchema> = {
             };
 
@@ -145,6 +147,74 @@ export function RegisterRoutes(router: KoaRouter) {
             const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(context.request) : iocContainer;
 
             const controller: any = await container.get<ThermostatController>(ThermostatController);
+            if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+            }
+
+            return templateService.apiHandler({
+              methodName: 'enable',
+              controller,
+              context,
+              validatedArgs,
+              successStatus: undefined,
+            });
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        router.put('/v1/thermostat/disable',
+            ...(fetchMiddlewares<Middleware>(ThermostatController)),
+            ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.disable)),
+
+            async function ThermostatController_disable(context: Context, next: Next) {
+            const args: Record<string, TsoaRoute.ParameterSchema> = {
+            };
+
+            let validatedArgs: any[] = [];
+            try {
+              validatedArgs = templateService.getValidatedArgs({ args, context, next });
+            } catch (err) {
+              const error = err as any;
+              error.message ||= JSON.stringify({ fields: error.fields });
+              context.status = error.status;
+              context.throw(context.status, error.message, error);
+            }
+
+            const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(context.request) : iocContainer;
+
+            const controller: any = await container.get<ThermostatController>(ThermostatController);
+            if (typeof controller['setStatus'] === 'function') {
+                controller.setStatus(undefined);
+            }
+
+            return templateService.apiHandler({
+              methodName: 'disable',
+              controller,
+              context,
+              validatedArgs,
+              successStatus: undefined,
+            });
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        router.get('/v1/sensor',
+            ...(fetchMiddlewares<Middleware>(SensorController)),
+            ...(fetchMiddlewares<Middleware>(SensorController.prototype.getMeasurement)),
+
+            async function SensorController_getMeasurement(context: Context, next: Next) {
+            const args: Record<string, TsoaRoute.ParameterSchema> = {
+            };
+
+            let validatedArgs: any[] = [];
+            try {
+              validatedArgs = templateService.getValidatedArgs({ args, context, next });
+            } catch (err) {
+              const error = err as any;
+              error.message ||= JSON.stringify({ fields: error.fields });
+              context.status = error.status;
+              context.throw(context.status, error.message, error);
+            }
+
+            const container: IocContainer = typeof iocContainer === 'function' ? (iocContainer as IocContainerFactory)(context.request) : iocContainer;
+
+            const controller: any = await container.get<SensorController>(SensorController);
             if (typeof controller['setStatus'] === 'function') {
                 controller.setStatus(undefined);
             }

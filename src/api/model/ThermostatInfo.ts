@@ -1,8 +1,8 @@
 export interface ThermostatInfo {
   readonly targetTemperature: number;
+  readonly temperatureUncertainty: number;
   readonly lowestTemperature: number;
   readonly highestTemperature: number;
-  readonly delta: number;
 }
 
 export interface UpdateTemperature {
