@@ -4,35 +4,39 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"
+      - "3001:3001"
+      - "3002:3002"
     environment:
       - NODE_ENV=production
-      - PORT=3000
       # See https://www.daikinone.com/openapi/documentation/index.html
       - DAIKIN_INTEGRATOR_TOKEN=
       - DAIKIN_EMAIL=
       - DAIKIN_API_KEY=
+
       # The port the REST api is listening
       - SERVER_PORT=3001
       # The port the Websocket api is listening
       - WS_PORT=3002
+
       # The interval for which the Websocket is broadcasting data
       - WS_UPDATE_INTERVAL_MS=10000
       # The interval for which the thermostat information are updated.
       - UPDATE_THERMOSTAT_INTERVAL_MS=30000
-      # How often the thermostat mode can be updated
-      - MAX_THERMOSTAT_UPDATE_FREQUENCY_MS = 30000
       # The interval for which the temperature controller is executed and potentially
       # makes adjustments to the thermostat temperature in order to reach the set target temperature.
-      - TEMPERATURE_CONTROLLER_INTERVAL_MS=10000
+      - TEMPERATURE_CONTROLLER_INTERVAL_MS=20000
+      # How often the thermostat mode can be updated
+      - MAX_THERMOSTAT_UPDATE_FREQUENCY_MS=30000
+
       # If not target temperature was set yet use this as the default target temperature.
-      - DEFAULT_TARET_TEMPERATURE=21.4
+      - DEFAULT_TARET_TEMPERATURE=21.2
       # The uncertainty range for which the controller will not do anything.
       # The used range is plus and minus this value.
-      - TEMPERATURE_UNCERTAINTY=1.0
+      - TEMPERATURE_UNCERTAINTY=0.2
       # If the controller needs to adjust the temperature at the thermostat,
       # it will use this value as increment.
       - THERMOSTAT_ADJUSTMENT_INCREMENT=0.5
+
       # The directory where the state of the app is persistet to
       - DATA_DIR=/var/lib/thermo"
     command: ["node", "dist/app.js"]

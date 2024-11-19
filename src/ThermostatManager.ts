@@ -13,7 +13,7 @@ import {
 } from "./client/daikin/DaikinTypes";
 import { container } from "tsyringe";
 import { logger } from "./Logging";
-import { ThermostatInfo } from "./api/model/ThermostatInfo";
+import { ThermostatInfo, ThermostatStatus } from "./api/model/ThermostatInfo";
 import { SensorClient } from "./client/sensor/SensorClient";
 import { Measurement } from "./client/sensor/SensorTypes";
 
@@ -64,7 +64,8 @@ export class ThermostatManager {
   private initialDevice: Device | undefined;
   private running: boolean = true;
   private state: ThermostatState;
-  private lastThermostatUpdate: number = 0;
+  private lastThermostatUpdateTimestamp: number = 0;
+  private lastMeasurement: Measurement | undefined;
 
   public constructor(
     @inject("DaikinClient") private readonly daikinClient: DaikinClient,
@@ -98,9 +99,11 @@ export class ThermostatManager {
     }
     this.stateFilePath = path.join(dataDir, ThermostatManager.STATE_FILE);
     if (fs.existsSync(this.stateFilePath)) {
-      this.state = thermostatStateSchema.parse(
+      const stateData: any = JSON.parse(
         fs.readFileSync(this.stateFilePath, { encoding: "utf8", flag: "r" }),
       );
+      ThermostatManager.LOGGER.info({ stateData }, "Parsing state data");
+      this.state = thermostatStateSchema.parse(stateData);
     } else {
       this.state = thermostatStateSchema.parse({});
     }
@@ -132,6 +135,7 @@ export class ThermostatManager {
         );
       }
       await this.updateThermostat();
+      await this.controlTemperature();
       this.initialDevice = this.device;
       this.running = true;
       this.scheduleUpdateThermostat();
@@ -144,7 +148,7 @@ export class ThermostatManager {
       } else {
         throw new ThermostatManagerError(
           ThermostatManagerErrorType.INIT_ERROR,
-          "Could initialize",
+          "Could not initialize",
         );
       }
     }
@@ -160,6 +164,9 @@ export class ThermostatManager {
     }
     if (this.device) {
       return {
+        sensorTemperature: this.lastMeasurement!.temperature,
+        sensorHumidity: this.lastMeasurement!.humidity,
+        status: this.getThermostatStatus(),
         targetTemperature: this.state.targetTemperature,
         highestTemperature: this.device.setpointMaximum,
         lowestTemperature: this.device.setpointMinimum,
@@ -323,6 +330,24 @@ export class ThermostatManager {
     }
   }
 
+  private getThermostatStatus(): ThermostatStatus {
+    if (!this.running) {
+      return ThermostatStatus.STOPPED;
+    }
+    if (!this.device?.equipmentStatus) {
+      return ThermostatStatus.OFF;
+    }
+    switch (this.device.equipmentStatus) {
+      case EquipmentStatus.COOL:
+        return ThermostatStatus.COOL;
+      case EquipmentStatus.IDLE:
+        return ThermostatStatus.IDLE;
+      case EquipmentStatus.HEAT:
+        return ThermostatStatus.HEAT;
+    }
+    return ThermostatStatus.OFF;
+  }
+
   private async updateMode(
     deviceId: string,
     thermostatUpdate: UpdateModeRequest,
@@ -331,19 +356,19 @@ export class ThermostatManager {
       {
         deviceId,
         thermostatUpdate,
-        lastThermostatUpdate: this.lastThermostatUpdate,
+        lastThermostatUpdate: this.lastThermostatUpdateTimestamp,
         maxThermostatUpdateFrequency: this.maxThermostatUpdateFrequency,
         now: Date.now(),
       },
       "Checkin if can update thermostat mode",
     );
     if (
-      this.lastThermostatUpdate <=
+      this.lastThermostatUpdateTimestamp <=
       Date.now() - this.maxThermostatUpdateFrequency
     ) {
       logger.info({ thermostatUpdate }, "Updating thermostat mode");
       await this.daikinClient.updateMode(deviceId, thermostatUpdate);
-      this.lastThermostatUpdate = Date.now();
+      this.lastThermostatUpdateTimestamp = Date.now();
     }
   }
 
@@ -356,27 +381,27 @@ export class ThermostatManager {
         ThermostatManager.LOGGER.error(logCtx, "Device is undefined");
         return;
       }
-      const measurement: Measurement = await this.sensorClient.getMeasurement();
+      this.lastMeasurement = await this.sensorClient.getMeasurement();
       const logger = ThermostatManager.LOGGER.child({
         ...logCtx,
-        measurement,
+        measurement: this.lastMeasurement,
         state: this.state,
         temperatureUncertainty: this.temperatureUncertainty,
         device: this.device,
       });
       logger.info("Received temperature");
       if (
-        measurement.temperature >
+        this.lastMeasurement.temperature >
         this.state.targetTemperature + this.temperatureUncertainty
       ) {
-        return this.cool(this.device, measurement.temperature);
+        return this.cool(this.device, this.lastMeasurement.temperature);
       } else if (
-        measurement.temperature <
+        this.lastMeasurement.temperature <
         this.state.targetTemperature - this.temperatureUncertainty
       ) {
-        return this.heat(this.device, measurement.temperature);
+        return this.heat(this.device, this.lastMeasurement.temperature);
       } else {
-        return this.idle(this.device, measurement.temperature);
+        return this.idle(this.device, this.lastMeasurement.temperature);
       }
     } catch (error) {
       logger.error({ error }, "Error while controlling temperature");
@@ -393,6 +418,7 @@ export class ThermostatManager {
           if (this.running) {
             this.wss.clients.forEach((client: WebSocket.WebSocket): void => {
               logger.info({ client }, "Updating client");
+              //client.send(data)
             });
           }
         } finally {

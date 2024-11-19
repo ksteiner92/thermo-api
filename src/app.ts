@@ -1,13 +1,14 @@
 import "reflect-metadata";
-import Koa from "koa";
+import { bodyParser } from "@koa/bodyparser";
 import Router from "@koa/router";
 import cors from "@koa/cors";
+import Koa from "koa";
+import KoaPino from "koa-pino-logger";
 import "dotenv/config";
 import { RegisterRoutes } from "./api/routes";
 import { ThermostatManager } from "./ThermostatManager";
 import { registerTypes } from "./ioc/Register";
 import { logger } from "./Logging";
-import KoaPino from "koa-pino-logger";
 
 registerTypes();
 
@@ -16,6 +17,7 @@ const router = new Router();
 RegisterRoutes(router);
 app.use(KoaPino());
 app.use(cors());
+app.use(bodyParser());
 app.use(router.routes());
 app.listen(process.env.SERVER_PORT, () => {
   logger.info(

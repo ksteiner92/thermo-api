@@ -15,11 +15,19 @@ import type * as KoaRouter from '@koa/router';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 
 const models: TsoaRoute.Models = {
+    "ThermostatStatus": {
+        "dataType": "refEnum",
+        "enums": ["OFF","COOL","HEAT","IDLE","STOPPED"],
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ThermostatInfo": {
         "dataType": "refObject",
         "properties": {
+            "sensorTemperature": {"dataType":"double","required":true},
+            "sensorHumidity": {"dataType":"double","required":true},
             "targetTemperature": {"dataType":"double","required":true},
             "temperatureUncertainty": {"dataType":"double","required":true},
+            "status": {"ref":"ThermostatStatus","required":true},
             "lowestTemperature": {"dataType":"double","required":true},
             "highestTemperature": {"dataType":"double","required":true},
         },
