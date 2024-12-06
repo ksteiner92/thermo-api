@@ -427,15 +427,27 @@ export class ThermostatManager {
       state: this.state,
       device: this.device,
     });
-    this.lastMeasurement = await this.sensorClient.getMeasurement();
-    logger.info(
-      {
-        measurement: this.lastMeasurement,
-        state: this.state,
-        device: this.device,
-      },
-      "Received temperature",
-    );
+    try {
+      this.lastMeasurement = await this.sensorClient.getMeasurement();
+      logger.info(
+        {
+          measurement: this.lastMeasurement,
+          state: this.state,
+          device: this.device,
+        },
+        "Received temperature",
+      );
+    } catch (error) {
+      logger.info(
+        {
+          measurement: this.lastMeasurement,
+          state: this.state,
+          device: this.device,
+          error,
+        },
+        "Error while polling sensor",
+      );
+    }
   }
 
   private async controlTemperature(): Promise<void> {
