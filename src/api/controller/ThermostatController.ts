@@ -1,10 +1,7 @@
 import { Body, Controller, Get, Put, Route } from "@tsoa/runtime";
 import { inject, injectable } from "tsyringe";
 import { ThermostatManager } from "../../ThermostatManager";
-import type {
-  ThermostatInfo,
-  UpdateTemperature,
-} from "../model/ThermostatInfo";
+import type { ThermostatInfo, UpdateSetpoints } from "../model/ThermostatInfo";
 
 @injectable()
 @Route("/v1/thermostat")
@@ -15,11 +12,11 @@ export class ThermostatController extends Controller {
     super();
   }
 
-  @Put("/temperature")
-  public async updateTemperature(
-    @Body() update: UpdateTemperature,
-  ): Promise<ThermostatInfo> {
-    this.thermostatManager.updateTargetTemperature(update.temperature);
+  @Put("/setpoints")
+  public async updateSetpoints(
+    @Body() update: UpdateSetpoints,
+  ): Promise<ThermostatInfo | void> {
+    this.thermostatManager.updateSetpoints(update);
     return this.thermostatManager.getThermostatInfo();
   }
 

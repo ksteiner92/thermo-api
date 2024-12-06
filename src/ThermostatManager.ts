@@ -13,7 +13,11 @@ import {
 } from "./client/daikin/DaikinTypes";
 import { container } from "tsyringe";
 import { logger } from "./Logging";
-import { ThermostatInfo, ThermostatStatus } from "./api/model/ThermostatInfo";
+import {
+  ThermostatInfo,
+  ThermostatStatus,
+  UpdateSetpoints,
+} from "./api/model/ThermostatInfo";
 import { SensorClient } from "./client/sensor/SensorClient";
 import { Measurement } from "./client/sensor/SensorTypes";
 
@@ -22,6 +26,7 @@ export enum ThermostatManagerErrorType {
   THERMOSTAT_UPDATE_ERROR,
   THERMOSTAT_INFO_ERROR,
   DATA_ERROR,
+  VALIDATION_ERROR,
 }
 
 export class ThermostatManagerError extends Error {
@@ -36,9 +41,8 @@ export class ThermostatManagerError extends Error {
 }
 
 const thermostatStateSchema = z.object({
-  targetTemperature: z
-    .number()
-    .default(parseFloat(process.env.DEFAULT_TARET_TEMPERATURE ?? "")),
+  coolSetpoint: z.number().default(parseFloat(process.env.COOL_SETPOINT ?? "")),
+  heatSetpoint: z.number().default(parseFloat(process.env.HEAT_SETPOINT ?? "")),
 });
 type ThermostatState = z.infer<typeof thermostatStateSchema>;
 
@@ -48,14 +52,11 @@ export class ThermostatManager {
     clazz: ThermostatManager.name,
   });
   private static readonly STATE_FILE: string = "thermostat-state.json";
-  private readonly temperatureUncertainty: number = parseFloat(
-    process.env.TEMPERATURE_UNCERTAINTY ?? "",
+  private readonly maxThermostatUpdateFrequency: number = parseInt(
+    process.env.MAX_THERMOSTAT_UPDATE_FREQUENCY_MS ?? "",
   );
   private readonly thermostatAdjustmentIncrement: number = parseFloat(
     process.env.THERMOSTAT_ADJUSTMENT_INCREMENT ?? "",
-  );
-  private readonly maxThermostatUpdateFrequency: number = parseInt(
-    process.env.MAX_THERMOSTAT_UPDATE_FREQUENCY_MS ?? "",
   );
   private readonly wss: WebSocketServer;
   private readonly stateFilePath: string;
@@ -99,7 +100,7 @@ export class ThermostatManager {
     }
     this.stateFilePath = path.join(dataDir, ThermostatManager.STATE_FILE);
     if (fs.existsSync(this.stateFilePath)) {
-      const stateData: any = JSON.parse(
+      const stateData: unknown = JSON.parse(
         fs.readFileSync(this.stateFilePath, { encoding: "utf8", flag: "r" }),
       );
       ThermostatManager.LOGGER.info({ stateData }, "Parsing state data");
@@ -134,10 +135,12 @@ export class ThermostatManager {
           "Could not find device",
         );
       }
+      await this.pollSensor();
       await this.updateThermostat();
       await this.controlTemperature();
       this.initialDevice = this.device;
       this.running = true;
+      this.schedulePollSensor();
       this.scheduleUpdateThermostat();
       this.scheduleTemperatureController();
       this.scheduleWebSocketUpdate();
@@ -167,10 +170,10 @@ export class ThermostatManager {
         sensorTemperature: this.lastMeasurement!.temperature,
         sensorHumidity: this.lastMeasurement!.humidity,
         status: this.getThermostatStatus(),
-        targetTemperature: this.state.targetTemperature,
+        coolSetpoint: this.state.coolSetpoint,
+        heatSetpoint: this.state.heatSetpoint,
         highestTemperature: this.device.setpointMaximum,
         lowestTemperature: this.device.setpointMinimum,
-        temperatureUncertainty: this.temperatureUncertainty,
       };
     } else {
       throw new ThermostatManagerError(
@@ -180,8 +183,48 @@ export class ThermostatManager {
     }
   }
 
-  public updateTargetTemperature(targetTemperature: number): void {
-    this.state.targetTemperature = targetTemperature;
+  public updateSetpoints(setpoints: UpdateSetpoints): void {
+    if (!this.device) {
+      throw new ThermostatManagerError(
+        ThermostatManagerErrorType.VALIDATION_ERROR,
+        "Thermostat manager not ready",
+      );
+    }
+    if (
+      setpoints.coolSetpoint > this.device.setpointMaximum ||
+      setpoints.coolSetpoint < this.device.setpointMinimum
+    ) {
+      throw new ThermostatManagerError(
+        ThermostatManagerErrorType.VALIDATION_ERROR,
+        "Cool setpoint out of bounds",
+      );
+    }
+    if (
+      setpoints.heatSetpoint < this.device.setpointMinimum ||
+      setpoints.heatSetpoint > this.device.setpointMaximum
+    ) {
+      throw new ThermostatManagerError(
+        ThermostatManagerErrorType.VALIDATION_ERROR,
+        "Heat setpoint out of bounds",
+      );
+    }
+    if (setpoints.coolSetpoint < setpoints.heatSetpoint) {
+      throw new ThermostatManagerError(
+        ThermostatManagerErrorType.VALIDATION_ERROR,
+        "Cool setpoint cannot be smaller than heat setpoint",
+      );
+    }
+    if (
+      Math.abs(setpoints.coolSetpoint - setpoints.heatSetpoint) <
+      this.device.setpointDelta
+    ) {
+      throw new ThermostatManagerError(
+        ThermostatManagerErrorType.VALIDATION_ERROR,
+        "Difference between cool and heat setpoint too small",
+      );
+    }
+    this.state.coolSetpoint = setpoints.coolSetpoint;
+    this.state.heatSetpoint = setpoints.heatSetpoint;
     fs.writeFileSync(this.stateFilePath, JSON.stringify(this.state), {
       encoding: "utf8",
       flag: "w",
@@ -189,7 +232,12 @@ export class ThermostatManager {
   }
 
   private async updateThermostat(): Promise<void> {
-    const logger = ThermostatManager.LOGGER.child({ fn: "updateThermostat" });
+    const logger = ThermostatManager.LOGGER.child({
+      fn: "updateThermostat",
+      measurement: this.lastMeasurement,
+      state: this.state,
+      device: this.device,
+    });
     logger.info("Updating thermostat");
     this.device = await this.daikinClient.getDevice(this.deviceId ?? "");
     logger.info({ device: this.device }, "Thermostat updated");
@@ -372,33 +420,48 @@ export class ThermostatManager {
     }
   }
 
+  private async pollSensor(): Promise<void> {
+    const logger = ThermostatManager.LOGGER.child({
+      fn: "updateThermostat",
+      measurement: this.lastMeasurement,
+      state: this.state,
+      device: this.device,
+    });
+    this.lastMeasurement = await this.sensorClient.getMeasurement();
+    logger.info(
+      {
+        measurement: this.lastMeasurement,
+        state: this.state,
+        device: this.device,
+      },
+      "Received temperature",
+    );
+  }
+
   private async controlTemperature(): Promise<void> {
     const logCtx = {
       fn: "controlTemperature",
     };
     try {
-      if (!this.device || !this.deviceId || !this.state) {
-        ThermostatManager.LOGGER.error(logCtx, "Device is undefined");
-        return;
-      }
-      this.lastMeasurement = await this.sensorClient.getMeasurement();
       const logger = ThermostatManager.LOGGER.child({
         ...logCtx,
         measurement: this.lastMeasurement,
         state: this.state,
-        temperatureUncertainty: this.temperatureUncertainty,
         device: this.device,
       });
       logger.info("Received temperature");
       if (
-        this.lastMeasurement.temperature >
-        this.state.targetTemperature + this.temperatureUncertainty
+        !this.device ||
+        !this.deviceId ||
+        !this.state ||
+        !this.lastMeasurement
       ) {
+        logger.error("Not fully initialized");
+        return;
+      }
+      if (this.lastMeasurement.temperature > this.state.coolSetpoint) {
         return this.cool(this.device, this.lastMeasurement.temperature);
-      } else if (
-        this.lastMeasurement.temperature <
-        this.state.targetTemperature - this.temperatureUncertainty
-      ) {
+      } else if (this.lastMeasurement.temperature < this.state.heatSetpoint) {
         return this.heat(this.device, this.lastMeasurement.temperature);
       } else {
         return this.idle(this.device, this.lastMeasurement.temperature);
@@ -408,6 +471,24 @@ export class ThermostatManager {
     }
   }
 
+  private schedulePollSensor(): void {
+    const logger = ThermostatManager.LOGGER.child({
+      fn: "schedulePollSensor",
+    });
+    setTimeout(
+      async (): Promise<void> => {
+        try {
+          this.pollSensor();
+        } catch (error) {
+          logger.error({ error }, "Exception during polling sensor");
+        } finally {
+          this.schedulePollSensor();
+        }
+      },
+      parseInt(process.env.SENSOR_POLL_INTERVAL_MS ?? ""),
+    );
+  }
+
   private scheduleWebSocketUpdate(): void {
     const logger = ThermostatManager.LOGGER.child({
       fn: "scheduleWebSocketUpdate",
@@ -415,16 +496,12 @@ export class ThermostatManager {
     setTimeout(
       async (): Promise<void> => {
         try {
-          if (this.running) {
-            this.wss.clients.forEach((client: WebSocket.WebSocket): void => {
-              logger.info({ client }, "Updating client");
-              //client.send(data)
-            });
-          }
+          this.wss.clients.forEach((client: WebSocket.WebSocket): void => {
+            logger.info({ client }, "Updating client");
+            //client.send(data)
+          });
         } finally {
-          if (this.running) {
-            this.scheduleUpdateThermostat();
-          }
+          this.scheduleUpdateThermostat();
         }
       },
       parseInt(process.env.WS_UPDATE_INTERVAL_MS ?? ""),
@@ -438,15 +515,11 @@ export class ThermostatManager {
     setTimeout(
       async (): Promise<void> => {
         try {
-          if (this.running) {
-            await this.updateThermostat();
-          }
+          await this.updateThermostat();
         } catch (error) {
           logger.error({ error }, "Exception during updating thermostat");
         } finally {
-          if (this.running) {
-            this.scheduleUpdateThermostat();
-          }
+          this.scheduleUpdateThermostat();
         }
       },
       parseInt(process.env.UPDATE_THERMOSTAT_INTERVAL_MS ?? ""),
@@ -460,6 +533,18 @@ export class ThermostatManager {
     setTimeout(
       async (): Promise<void> => {
         try {
+          if (!this.device || !this.deviceId || !this.state) {
+            logger.error("Device is undefined");
+            return;
+          }
+          logger.info(
+            {
+              measurement: this.lastMeasurement,
+              state: this.state,
+              device: this.device,
+            },
+            "Received temperature",
+          );
           if (this.running) {
             this.controlTemperature();
           }

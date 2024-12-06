@@ -9,6 +9,7 @@ import { RegisterRoutes } from "./api/routes";
 import { ThermostatManager } from "./ThermostatManager";
 import { registerTypes } from "./ioc/Register";
 import { logger } from "./Logging";
+import { errorHandling } from "./api/ErrorHandling";
 
 registerTypes();
 
@@ -18,6 +19,7 @@ RegisterRoutes(router);
 app.use(KoaPino());
 app.use(cors());
 app.use(bodyParser());
+app.use(errorHandling());
 app.use(router.routes());
 app.listen(process.env.SERVER_PORT, () => {
   logger.info(

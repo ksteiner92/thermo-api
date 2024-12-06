@@ -9,13 +9,20 @@ export enum ThermostatStatus {
 export interface ThermostatInfo {
   readonly sensorTemperature: number;
   readonly sensorHumidity: number;
-  readonly targetTemperature: number;
-  readonly temperatureUncertainty: number;
+  readonly coolSetpoint: number;
+  readonly heatSetpoint: number;
   readonly status: ThermostatStatus;
   readonly lowestTemperature: number;
   readonly highestTemperature: number;
 }
 
-export interface UpdateTemperature {
-  readonly temperature: number;
+export interface UpdateSetpoints {
+  /**
+   * @isDouble
+   */
+  readonly coolSetpoint: number;
+  /**
+   * @isDouble
+   */
+  readonly heatSetpoint: number;
 }

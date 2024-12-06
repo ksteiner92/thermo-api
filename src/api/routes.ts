@@ -25,8 +25,8 @@ const models: TsoaRoute.Models = {
         "properties": {
             "sensorTemperature": {"dataType":"double","required":true},
             "sensorHumidity": {"dataType":"double","required":true},
-            "targetTemperature": {"dataType":"double","required":true},
-            "temperatureUncertainty": {"dataType":"double","required":true},
+            "coolSetpoint": {"dataType":"double","required":true},
+            "heatSetpoint": {"dataType":"double","required":true},
             "status": {"ref":"ThermostatStatus","required":true},
             "lowestTemperature": {"dataType":"double","required":true},
             "highestTemperature": {"dataType":"double","required":true},
@@ -34,10 +34,11 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "UpdateTemperature": {
+    "UpdateSetpoints": {
         "dataType": "refObject",
         "properties": {
-            "temperature": {"dataType":"double","required":true},
+            "coolSetpoint": {"dataType":"double","required":true},
+            "heatSetpoint": {"dataType":"double","required":true},
         },
         "additionalProperties": false,
     },
@@ -65,13 +66,13 @@ export function RegisterRoutes(router: KoaRouter) {
     // ###########################################################################################################
 
 
-        router.put('/v1/thermostat/temperature',
+        router.put('/v1/thermostat/setpoints',
             ...(fetchMiddlewares<Middleware>(ThermostatController)),
-            ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.updateTemperature)),
+            ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.updateSetpoints)),
 
-            async function ThermostatController_updateTemperature(context: Context, next: Next) {
+            async function ThermostatController_updateSetpoints(context: Context, next: Next) {
             const args: Record<string, TsoaRoute.ParameterSchema> = {
-                    update: {"in":"body","name":"update","required":true,"ref":"UpdateTemperature"},
+                    update: {"in":"body","name":"update","required":true,"ref":"UpdateSetpoints"},
             };
 
             let validatedArgs: any[] = [];
@@ -92,7 +93,7 @@ export function RegisterRoutes(router: KoaRouter) {
             }
 
             return templateService.apiHandler({
-              methodName: 'updateTemperature',
+              methodName: 'updateSetpoints',
               controller,
               context,
               validatedArgs,
