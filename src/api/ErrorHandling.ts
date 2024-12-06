@@ -4,6 +4,7 @@ import {
   ThermostatManagerErrorType,
 } from "../ThermostatManager";
 import { StatusCodes } from "http-status-codes";
+import { ValidateError } from "@tsoa/runtime";
 
 export function errorHandling(): Koa.Middleware<
   Koa.DefaultState,
@@ -20,8 +21,11 @@ export function errorHandling(): Koa.Middleware<
         if (error.type === ThermostatManagerErrorType.VALIDATION_ERROR) {
           ctx.status = StatusCodes.UNPROCESSABLE_ENTITY;
         }
-      } else {
+      } else if (error instanceof ValidateError) {
         throw error;
+      } else {
+        ctx.status = StatusCodes.INTERNAL_SERVER_ERROR;
+        ctx.message = "Unhandled exception";
       }
     }
   };
