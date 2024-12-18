@@ -400,23 +400,26 @@ export class ThermostatManager {
     deviceId: string,
     thermostatUpdate: UpdateModeRequest,
   ): Promise<void> {
-    logger.info(
-      {
-        deviceId,
-        thermostatUpdate,
-        lastThermostatUpdate: this.lastThermostatUpdateTimestamp,
-        maxThermostatUpdateFrequency: this.maxThermostatUpdateFrequency,
-        now: Date.now(),
-      },
-      "Checkin if can update thermostat mode",
-    );
+    const logger = ThermostatManager.LOGGER.child({
+      fn: "updateMode",
+      deviceId,
+      thermostatUpdate,
+      lastThermostatUpdate: this.lastThermostatUpdateTimestamp,
+      maxThermostatUpdateFrequency: this.maxThermostatUpdateFrequency,
+      now: Date.now(),
+    });
+    logger.info("Checkin if can update thermostat mode");
     if (
       this.lastThermostatUpdateTimestamp <=
       Date.now() - this.maxThermostatUpdateFrequency
     ) {
-      logger.info({ thermostatUpdate }, "Updating thermostat mode");
-      await this.daikinClient.updateMode(deviceId, thermostatUpdate);
-      this.lastThermostatUpdateTimestamp = Date.now();
+      try {
+        logger.info({ thermostatUpdate }, "Updating thermostat mode");
+        await this.daikinClient.updateMode(deviceId, thermostatUpdate);
+        this.lastThermostatUpdateTimestamp = Date.now();
+      } catch (error) {
+        logger.error({ error }, "Unable to update thermostat");
+      }
     }
   }
 
