@@ -1,7 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-import { TsoaRoute, fetchMiddlewares, KoaTemplateService } from '@tsoa/runtime';
+import type { TsoaRoute } from '@tsoa/runtime';
+import { fetchMiddlewares, KoaTemplateService } from '@tsoa/runtime';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ThermostatController } from './controller/ThermostatController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
@@ -66,18 +67,18 @@ export function RegisterRoutes(router: KoaRouter) {
     // ###########################################################################################################
 
 
+        const argsThermostatController_updateSetpoints: Record<string, TsoaRoute.ParameterSchema> = {
+                update: {"in":"body","name":"update","required":true,"ref":"UpdateSetpoints"},
+        };
         router.put('/v1/thermostat/setpoints',
             ...(fetchMiddlewares<Middleware>(ThermostatController)),
             ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.updateSetpoints)),
 
             async function ThermostatController_updateSetpoints(context: Context, next: Next) {
-            const args: Record<string, TsoaRoute.ParameterSchema> = {
-                    update: {"in":"body","name":"update","required":true,"ref":"UpdateSetpoints"},
-            };
 
             let validatedArgs: any[] = [];
             try {
-              validatedArgs = templateService.getValidatedArgs({ args, context, next });
+              validatedArgs = templateService.getValidatedArgs({ args: argsThermostatController_updateSetpoints, context, next });
             } catch (err) {
               const error = err as any;
               error.message ||= JSON.stringify({ fields: error.fields });
@@ -101,17 +102,17 @@ export function RegisterRoutes(router: KoaRouter) {
             });
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsThermostatController_getInfo: Record<string, TsoaRoute.ParameterSchema> = {
+        };
         router.get('/v1/thermostat/info',
             ...(fetchMiddlewares<Middleware>(ThermostatController)),
             ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.getInfo)),
 
             async function ThermostatController_getInfo(context: Context, next: Next) {
-            const args: Record<string, TsoaRoute.ParameterSchema> = {
-            };
 
             let validatedArgs: any[] = [];
             try {
-              validatedArgs = templateService.getValidatedArgs({ args, context, next });
+              validatedArgs = templateService.getValidatedArgs({ args: argsThermostatController_getInfo, context, next });
             } catch (err) {
               const error = err as any;
               error.message ||= JSON.stringify({ fields: error.fields });
@@ -135,17 +136,17 @@ export function RegisterRoutes(router: KoaRouter) {
             });
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsThermostatController_enable: Record<string, TsoaRoute.ParameterSchema> = {
+        };
         router.put('/v1/thermostat/enable',
             ...(fetchMiddlewares<Middleware>(ThermostatController)),
             ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.enable)),
 
             async function ThermostatController_enable(context: Context, next: Next) {
-            const args: Record<string, TsoaRoute.ParameterSchema> = {
-            };
 
             let validatedArgs: any[] = [];
             try {
-              validatedArgs = templateService.getValidatedArgs({ args, context, next });
+              validatedArgs = templateService.getValidatedArgs({ args: argsThermostatController_enable, context, next });
             } catch (err) {
               const error = err as any;
               error.message ||= JSON.stringify({ fields: error.fields });
@@ -169,17 +170,17 @@ export function RegisterRoutes(router: KoaRouter) {
             });
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsThermostatController_disable: Record<string, TsoaRoute.ParameterSchema> = {
+        };
         router.put('/v1/thermostat/disable',
             ...(fetchMiddlewares<Middleware>(ThermostatController)),
             ...(fetchMiddlewares<Middleware>(ThermostatController.prototype.disable)),
 
             async function ThermostatController_disable(context: Context, next: Next) {
-            const args: Record<string, TsoaRoute.ParameterSchema> = {
-            };
 
             let validatedArgs: any[] = [];
             try {
-              validatedArgs = templateService.getValidatedArgs({ args, context, next });
+              validatedArgs = templateService.getValidatedArgs({ args: argsThermostatController_disable, context, next });
             } catch (err) {
               const error = err as any;
               error.message ||= JSON.stringify({ fields: error.fields });
@@ -203,17 +204,17 @@ export function RegisterRoutes(router: KoaRouter) {
             });
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsSensorController_getMeasurement: Record<string, TsoaRoute.ParameterSchema> = {
+        };
         router.get('/v1/sensor',
             ...(fetchMiddlewares<Middleware>(SensorController)),
             ...(fetchMiddlewares<Middleware>(SensorController.prototype.getMeasurement)),
 
             async function SensorController_getMeasurement(context: Context, next: Next) {
-            const args: Record<string, TsoaRoute.ParameterSchema> = {
-            };
 
             let validatedArgs: any[] = [];
             try {
-              validatedArgs = templateService.getValidatedArgs({ args, context, next });
+              validatedArgs = templateService.getValidatedArgs({ args: argsSensorController_getMeasurement, context, next });
             } catch (err) {
               const error = err as any;
               error.message ||= JSON.stringify({ fields: error.fields });
