@@ -18,7 +18,7 @@ import type * as KoaRouter from '@koa/router';
 const models: TsoaRoute.Models = {
     "ThermostatStatus": {
         "dataType": "refEnum",
-        "enums": ["OFF","COOL","HEAT","IDLE","STOPPED"],
+        "enums": ["OFF","COOL","HEAT","IDLE","ERROR","STOPPED"],
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ThermostatInfo": {

@@ -29,6 +29,8 @@ services:
       - MAX_THERMOSTAT_UPDATE_FREQUENCY_MS=30000
       # The interval by which the sensor is polled
       - SENSOR_POLL_INTERVAL_MS=30000
+      # After which number of sensor poll failures the thermostat will put into error state and stop updating the thermostat.
+      - ERROR_AFTER_NUM_SENSOR_POLL_FAILURES=5
 
       # The temperature threshold, if below will trigger heating
       - HEAT_SETPOINT=19.0

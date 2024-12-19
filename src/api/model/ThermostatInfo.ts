@@ -3,6 +3,7 @@ export enum ThermostatStatus {
   COOL = "COOL",
   HEAT = "HEAT",
   IDLE = "IDLE",
+  ERROR = "ERROR",
   STOPPED = "STOPPED",
 }
 

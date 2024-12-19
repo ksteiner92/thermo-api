@@ -58,6 +58,9 @@ export class ThermostatManager {
   private readonly thermostatAdjustmentIncrement: number = parseFloat(
     process.env.THERMOSTAT_ADJUSTMENT_INCREMENT ?? "",
   );
+  private readonly errorAfterNumSensorPollFailures: number = parseInt(
+    process.env.ERROR_AFTER_NUM_SENSOR_POLL_FAILURES ?? "",
+  );
   private readonly wss: WebSocketServer;
   private readonly stateFilePath: string;
   private deviceId: string | undefined;
@@ -67,6 +70,11 @@ export class ThermostatManager {
   private state: ThermostatState;
   private lastThermostatUpdateTimestamp: number = 0;
   private lastMeasurement: Measurement | undefined;
+  private sensorPollFailureCount: number = 0;
+  private updateThermostatTaskId: NodeJS.Timeout | undefined;
+  private temperatureControllerTaskId: NodeJS.Timeout | undefined;
+  private webSocketUpdateTaskId: NodeJS.Timeout | undefined;
+  private pollSensorTaskId: NodeJS.Timeout | undefined;
 
   public constructor(
     @inject("DaikinClient") private readonly daikinClient: DaikinClient,
@@ -135,10 +143,15 @@ export class ThermostatManager {
           "Could not find device",
         );
       }
-      await this.pollSensor();
-      await this.updateThermostat();
+      if (!this.lastMeasurement) {
+        await this.pollSensor();
+      }
+      if (!this.device) {
+        await this.updateThermostat();
+      }
       await this.controlTemperature();
       this.initialDevice = this.device;
+      this.sensorPollFailureCount = 0;
       this.running = true;
       this.schedulePollSensor();
       this.scheduleUpdateThermostat();
@@ -379,6 +392,12 @@ export class ThermostatManager {
   }
 
   private getThermostatStatus(): ThermostatStatus {
+    if (
+      !this.running &&
+      this.sensorPollFailureCount >= this.errorAfterNumSensorPollFailures
+    ) {
+      return ThermostatStatus.ERROR;
+    }
     if (!this.running) {
       return ThermostatStatus.STOPPED;
     }
@@ -440,6 +459,9 @@ export class ThermostatManager {
         },
         "Received temperature",
       );
+      if (this.sensorPollFailureCount >= this.errorAfterNumSensorPollFailures) {
+        await this.start();
+      }
     } catch (error) {
       logger.info(
         {
@@ -450,6 +472,11 @@ export class ThermostatManager {
         },
         "Error while polling sensor",
       );
+      this.sensorPollFailureCount += 1;
+    } finally {
+      if (this.sensorPollFailureCount >= this.errorAfterNumSensorPollFailures) {
+        this.stop();
+      }
     }
   }
 
@@ -487,91 +514,100 @@ export class ThermostatManager {
   }
 
   private schedulePollSensor(): void {
-    const logger = ThermostatManager.LOGGER.child({
-      fn: "schedulePollSensor",
-    });
-    setTimeout(
-      async (): Promise<void> => {
-        try {
-          this.pollSensor();
-        } catch (error) {
-          logger.error({ error }, "Exception during polling sensor");
-        } finally {
-          this.schedulePollSensor();
-        }
-      },
-      parseInt(process.env.SENSOR_POLL_INTERVAL_MS ?? ""),
-    );
+    if (!this.pollSensorTaskId) {
+      const logger = ThermostatManager.LOGGER.child({
+        fn: "schedulePollSensor",
+      });
+      logger.info("Scheduling task");
+      this.pollSensorTaskId = setInterval(
+        async (): Promise<void> => {
+          try {
+            this.pollSensor();
+          } catch (error) {
+            logger.error({ error }, "Exception during polling sensor");
+          }
+        },
+        parseInt(process.env.SENSOR_POLL_INTERVAL_MS ?? ""),
+      );
+    }
   }
 
   private scheduleWebSocketUpdate(): void {
-    const logger = ThermostatManager.LOGGER.child({
-      fn: "scheduleWebSocketUpdate",
-    });
-    setTimeout(
-      async (): Promise<void> => {
-        try {
-          this.wss.clients.forEach((client: WebSocket.WebSocket): void => {
-            logger.info({ client }, "Updating client");
-            //client.send(data)
-          });
-        } finally {
-          this.scheduleUpdateThermostat();
-        }
-      },
-      parseInt(process.env.WS_UPDATE_INTERVAL_MS ?? ""),
-    );
+    if (!this.webSocketUpdateTaskId) {
+      const logger = ThermostatManager.LOGGER.child({
+        fn: "scheduleWebSocketUpdate",
+      });
+      logger.info("Scheduling task");
+      this.webSocketUpdateTaskId = setInterval(
+        async (): Promise<void> => {
+          try {
+            this.wss.clients.forEach((client: WebSocket.WebSocket): void => {
+              logger.info({ client }, "Updating client");
+              //client.send(data)
+            });
+          } catch (error) {
+            logger.error({ error }, "Exception websocket update");
+          }
+        },
+        parseInt(process.env.WS_UPDATE_INTERVAL_MS ?? ""),
+      );
+    }
   }
 
   private scheduleUpdateThermostat(): void {
-    const logger = ThermostatManager.LOGGER.child({
-      fn: "scheduleUpdateThermostat",
-    });
-    setTimeout(
-      async (): Promise<void> => {
-        try {
-          await this.updateThermostat();
-        } catch (error) {
-          logger.error({ error }, "Exception during updating thermostat");
-        } finally {
-          this.scheduleUpdateThermostat();
-        }
-      },
-      parseInt(process.env.UPDATE_THERMOSTAT_INTERVAL_MS ?? ""),
-    );
+    if (!this.updateThermostatTaskId) {
+      const logger = ThermostatManager.LOGGER.child({
+        fn: "scheduleUpdateThermostat",
+      });
+      logger.info("Scheduling task");
+      this.updateThermostatTaskId = setInterval(
+        async (): Promise<void> => {
+          try {
+            await this.updateThermostat();
+          } catch (error) {
+            logger.error({ error }, "Exception during updating thermostat");
+          }
+        },
+        parseInt(process.env.UPDATE_THERMOSTAT_INTERVAL_MS ?? ""),
+      );
+    }
   }
 
   private scheduleTemperatureController(): void {
-    const logger = ThermostatManager.LOGGER.child({
-      fn: "scheduleTemperatureController",
-    });
-    setTimeout(
-      async (): Promise<void> => {
-        try {
-          if (!this.device || !this.deviceId || !this.state) {
-            logger.error("Device is undefined");
-            return;
+    if (!this.temperatureControllerTaskId) {
+      const logger = ThermostatManager.LOGGER.child({
+        fn: "scheduleTemperatureController",
+      });
+      logger.info("Scheduling task");
+      this.temperatureControllerTaskId = setInterval(
+        async (): Promise<void> => {
+          try {
+            if (!this.device || !this.deviceId || !this.state) {
+              logger.error("Device is undefined");
+              return;
+            }
+            logger.info(
+              {
+                measurement: this.lastMeasurement,
+                state: this.state,
+                device: this.device,
+              },
+              "Received temperature",
+            );
+            if (this.running) {
+              this.controlTemperature();
+            }
+          } catch (error) {
+            logger.error({ error }, "Exception during temperature contoller");
+          } finally {
+            if (!this.running) {
+              clearInterval(this.temperatureControllerTaskId);
+              this.temperatureControllerTaskId = undefined;
+            }
           }
-          logger.info(
-            {
-              measurement: this.lastMeasurement,
-              state: this.state,
-              device: this.device,
-            },
-            "Received temperature",
-          );
-          if (this.running) {
-            this.controlTemperature();
-          }
-        } catch (error) {
-          logger.error({ error }, "Exception during temperature contoller");
-        } finally {
-          if (this.running) {
-            this.scheduleTemperatureController();
-          }
-        }
-      },
-      parseInt(process.env.TEMPERATURE_CONTROLLER_INTERVAL_MS ?? ""),
-    );
+        },
+        parseInt(process.env.TEMPERATURE_CONTROLLER_INTERVAL_MS ?? ""),
+      );
+    }
   }
 }
