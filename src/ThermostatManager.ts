@@ -52,8 +52,11 @@ export class ThermostatManager {
     clazz: ThermostatManager.name,
   });
   private static readonly STATE_FILE: string = "thermostat-state.json";
-  private readonly maxThermostatUpdateFrequency: number = parseInt(
+  private readonly maxThermostatUpdateFrequencyMs: number = parseInt(
     process.env.MAX_THERMOSTAT_UPDATE_FREQUENCY_MS ?? "",
+  );
+  private readonly maxDeviceStalenessMs: number = parseInt(
+    process.env.MAX_DEVICE_STALENESS_MS ?? "",
   );
   private readonly thermostatAdjustmentIncrement: number = parseFloat(
     process.env.THERMOSTAT_ADJUSTMENT_INCREMENT ?? "",
@@ -65,6 +68,7 @@ export class ThermostatManager {
   private readonly stateFilePath: string;
   private deviceId: string | undefined;
   private device: Device | undefined;
+  private lastDeviceUpdateTimestamp: number = 0;
   private initialDevice: Device | undefined;
   private running: boolean = true;
   private state: ThermostatState;
@@ -251,9 +255,22 @@ export class ThermostatManager {
       state: this.state,
       device: this.device,
     });
-    logger.info("Updating thermostat");
-    this.device = await this.daikinClient.getDevice(this.deviceId ?? "");
-    logger.info({ device: this.device }, "Thermostat updated");
+    try {
+      logger.info("Updating thermostat");
+      this.device = await this.daikinClient.getDevice(this.deviceId ?? "");
+      logger.info({ device: this.device }, "Thermostat updated");
+      this.lastDeviceUpdateTimestamp = Date.now();
+    } catch (error) {
+      logger.error("Error updating thermostat");
+      throw error;
+    }
+  }
+
+  private isDeviceStale(): boolean {
+    return this.lastDeviceUpdateTimestamp === 0
+      ? false
+      : this.lastDeviceUpdateTimestamp <=
+          Date.now() - this.maxDeviceStalenessMs;
   }
 
   private async cool(device: Device, temperature: number): Promise<void> {
@@ -262,7 +279,10 @@ export class ThermostatManager {
       temperature,
       device: device,
     });
-    if (device.equipmentStatus !== EquipmentStatus.COOL) {
+    if (
+      device.equipmentStatus !== EquipmentStatus.COOL ||
+      this.isDeviceStale()
+    ) {
       logger.info("Setting thermostat to cooling");
       let thermostatSetPoint: number =
         device.tempIndoor - this.thermostatAdjustmentIncrement;
@@ -298,7 +318,10 @@ export class ThermostatManager {
       temperature,
       device: device,
     });
-    if (device.equipmentStatus !== EquipmentStatus.HEAT) {
+    if (
+      device.equipmentStatus !== EquipmentStatus.HEAT ||
+      this.isDeviceStale()
+    ) {
       logger.info("Setting thermostat to heating");
       let thermostatSetPoint: number =
         device.tempIndoor + this.thermostatAdjustmentIncrement;
@@ -333,7 +356,10 @@ export class ThermostatManager {
       temperature,
       device: device,
     });
-    if (device.equipmentStatus !== EquipmentStatus.IDLE) {
+    if (
+      device.equipmentStatus !== EquipmentStatus.IDLE ||
+      this.isDeviceStale()
+    ) {
       logger.info("Setting thermostat to idle");
       if (device.equipmentStatus === EquipmentStatus.COOL) {
         logger.info("Device is in cooling mode");
@@ -424,13 +450,13 @@ export class ThermostatManager {
       deviceId,
       thermostatUpdate,
       lastThermostatUpdate: this.lastThermostatUpdateTimestamp,
-      maxThermostatUpdateFrequency: this.maxThermostatUpdateFrequency,
+      maxThermostatUpdateFrequency: this.maxThermostatUpdateFrequencyMs,
       now: Date.now(),
     });
     logger.info("Checkin if can update thermostat mode");
     if (
       this.lastThermostatUpdateTimestamp <=
-      Date.now() - this.maxThermostatUpdateFrequency
+      Date.now() - this.maxThermostatUpdateFrequencyMs
     ) {
       try {
         logger.info({ thermostatUpdate }, "Updating thermostat mode");

@@ -31,6 +31,8 @@ services:
       - SENSOR_POLL_INTERVAL_MS=30000
       # After which number of sensor poll failures the thermostat will put into error state and stop updating the thermostat.
       - ERROR_AFTER_NUM_SENSOR_POLL_FAILURES=5
+      # The max staleness of the internal device object after which the manager will try to update the mode regardless
+      - MAX_DEVICE_STALENESS_MS=300000
 
       # The temperature threshold, if below will trigger heating
       - HEAT_SETPOINT=19.0
