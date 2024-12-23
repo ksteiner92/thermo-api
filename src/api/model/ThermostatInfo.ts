@@ -17,9 +17,9 @@ export interface ThermostatInfo {
   readonly thermostatCoolSetpoint: number;
   readonly lowestTemperature: number;
   readonly highestTemperature: number;
-  readonly deviceUpdatedLast: Date;
-  readonly thermostatUpdatedLast: Date;
-  readonly sensorPolledLast: Date;
+  readonly deviceUpdatedLast: string;
+  readonly thermostatUpdatedLast: string;
+  readonly sensorPolledLast: string;
 }
 
 export interface UpdateSetpoints {

@@ -179,6 +179,15 @@ export class ThermostatManager {
     this.running = false;
   }
 
+  private static formatTimestamp(timestamp: number): string {
+    const dateTimestamp = new Date(timestamp);
+    return (
+      dateTimestamp.toLocaleDateString() +
+      " " +
+      dateTimestamp.toLocaleTimeString()
+    );
+  }
+
   public async getThermostatInfo(): Promise<ThermostatInfo> {
     if (!this.device) {
       this.device = await this.daikinClient.getDevice(this.deviceId ?? "");
@@ -194,9 +203,15 @@ export class ThermostatManager {
         heatSetpoint: this.state.heatSetpoint,
         highestTemperature: this.device.setpointMaximum,
         lowestTemperature: this.device.setpointMinimum,
-        deviceUpdatedLast: new Date(this.lastDeviceUpdateTimestamp),
-        thermostatUpdatedLast: new Date(this.lastThermostatUpdateTimestamp),
-        sensorPolledLast: new Date(this.lastSensorPollTimestamp),
+        deviceUpdatedLast: ThermostatManager.formatTimestamp(
+          this.lastDeviceUpdateTimestamp,
+        ),
+        thermostatUpdatedLast: ThermostatManager.formatTimestamp(
+          this.lastThermostatUpdateTimestamp,
+        ),
+        sensorPolledLast: ThermostatManager.formatTimestamp(
+          this.lastSensorPollTimestamp,
+        ),
       };
     } else {
       throw new ThermostatManagerError(
