@@ -69,11 +69,12 @@ export class ThermostatManager {
   private deviceId: string | undefined;
   private device: Device | undefined;
   private lastDeviceUpdateTimestamp: number = 0;
+  private lastSensorPollTimestamp: number = 0;
+  private lastThermostatUpdateTimestamp: number = 0;
+  private lastMeasurement: Measurement | undefined;
   private initialDevice: Device | undefined;
   private running: boolean = true;
   private state: ThermostatState;
-  private lastThermostatUpdateTimestamp: number = 0;
-  private lastMeasurement: Measurement | undefined;
   private sensorPollFailureCount: number = 0;
   private updateThermostatTaskId: NodeJS.Timeout | undefined;
   private temperatureControllerTaskId: NodeJS.Timeout | undefined;
@@ -193,6 +194,9 @@ export class ThermostatManager {
         heatSetpoint: this.state.heatSetpoint,
         highestTemperature: this.device.setpointMaximum,
         lowestTemperature: this.device.setpointMinimum,
+        deviceUpdatedLast: new Date(this.lastDeviceUpdateTimestamp),
+        thermostatUpdatedLast: new Date(this.lastThermostatUpdateTimestamp),
+        sensorPolledLast: new Date(this.lastSensorPollTimestamp),
       };
     } else {
       throw new ThermostatManagerError(
@@ -479,6 +483,7 @@ export class ThermostatManager {
     });
     try {
       this.lastMeasurement = await this.sensorClient.getMeasurement();
+      this.lastSensorPollTimestamp = Date.now();
       logger.info(
         {
           measurement: this.lastMeasurement,
