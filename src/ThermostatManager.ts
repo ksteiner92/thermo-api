@@ -187,6 +187,8 @@ export class ThermostatManager {
         sensorTemperature: this.lastMeasurement!.temperature,
         sensorHumidity: this.lastMeasurement!.humidity,
         status: this.getThermostatStatus(),
+        thermostatCoolSetpoint: this.device.coolSetpoint,
+        thermostatHeatSetpoint: this.device.heatSetpoint,
         coolSetpoint: this.state.coolSetpoint,
         heatSetpoint: this.state.heatSetpoint,
         highestTemperature: this.device.setpointMaximum,

@@ -29,6 +29,8 @@ const models: TsoaRoute.Models = {
             "coolSetpoint": {"dataType":"double","required":true},
             "heatSetpoint": {"dataType":"double","required":true},
             "status": {"ref":"ThermostatStatus","required":true},
+            "thermostatHeatSetpoint": {"dataType":"double","required":true},
+            "thermostatCoolSetpoint": {"dataType":"double","required":true},
             "lowestTemperature": {"dataType":"double","required":true},
             "highestTemperature": {"dataType":"double","required":true},
         },

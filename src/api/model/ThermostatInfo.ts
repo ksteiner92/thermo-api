@@ -13,6 +13,8 @@ export interface ThermostatInfo {
   readonly coolSetpoint: number;
   readonly heatSetpoint: number;
   readonly status: ThermostatStatus;
+  readonly thermostatHeatSetpoint: number;
+  readonly thermostatCoolSetpoint: number;
   readonly lowestTemperature: number;
   readonly highestTemperature: number;
 }
