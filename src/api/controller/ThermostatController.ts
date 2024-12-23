@@ -26,12 +26,14 @@ export class ThermostatController extends Controller {
   }
 
   @Put("/enable")
-  public async enable(): Promise<void> {
-    return this.thermostatManager.start();
+  public async enable(): Promise<ThermostatInfo> {
+    await this.thermostatManager.start();
+    return this.thermostatManager.getThermostatInfo();
   }
 
   @Put("/disable")
-  public async disable(): Promise<void> {
-    return this.thermostatManager.stop();
+  public async disable(): Promise<ThermostatInfo> {
+    this.thermostatManager.stop();
+    return this.thermostatManager.getThermostatInfo();
   }
 }
