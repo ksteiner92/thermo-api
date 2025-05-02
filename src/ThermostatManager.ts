@@ -181,10 +181,13 @@ export class ThermostatManager {
 
   private static formatTimestamp(timestamp: number): string {
     const dateTimestamp = new Date(timestamp);
+    const options = {
+      timeZone: "America/Los_Angeles",
+    };
     return (
-      dateTimestamp.toLocaleDateString() +
+      dateTimestamp.toLocaleDateString("en-US", options) +
       " " +
-      dateTimestamp.toLocaleTimeString()
+      dateTimestamp.toLocaleTimeString("en-US", options)
     );
   }
 
@@ -252,15 +255,16 @@ export class ThermostatManager {
         "Cool setpoint cannot be smaller than heat setpoint",
       );
     }
-    if (
-      Math.abs(setpoints.coolSetpoint - setpoints.heatSetpoint) <
-      this.device.setpointDelta
-    ) {
-      throw new ThermostatManagerError(
-        ThermostatManagerErrorType.VALIDATION_ERROR,
-        "Difference between cool and heat setpoint too small",
-      );
-    }
+    // TODO: Renable
+    //if (
+    //  Math.abs(setpoints.coolSetpoint - setpoints.heatSetpoint) <
+    //  this.device.setpointDelta
+    //) {
+    //  throw new ThermostatManagerError(
+    //    ThermostatManagerErrorType.VALIDATION_ERROR,
+    //    "Difference between cool and heat setpoint too small",
+    //  );
+    //}
     this.state.coolSetpoint = setpoints.coolSetpoint;
     this.state.heatSetpoint = setpoints.heatSetpoint;
     fs.writeFileSync(this.stateFilePath, JSON.stringify(this.state), {
