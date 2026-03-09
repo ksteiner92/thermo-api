@@ -4,7 +4,12 @@ import { DaikinClient } from "../client/daikin/DaikinClient";
 import { ThermostatManager } from "../ThermostatManager";
 import { SensorClient } from "../client/sensor/SensorClient";
 
+let registered = false;
+
 export function registerTypes(): void {
+  if (registered) {
+    return;
+  }
   container.registerSingleton("DaikinClient", DaikinClient);
   container.registerSingleton("ThermostatManager", ThermostatManager);
   container.register("SensorClient", { useClass: SensorClient });
@@ -21,4 +26,5 @@ export function registerTypes(): void {
       timeout: 20000,
     }),
   );
+  registered = true;
 }

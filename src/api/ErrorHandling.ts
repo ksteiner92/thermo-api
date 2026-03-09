@@ -6,6 +6,11 @@ import {
 import { StatusCodes } from "http-status-codes";
 import { ValidateError } from "@tsoa/runtime";
 
+type HttpError = {
+  message?: string;
+  status?: number;
+};
+
 export function errorHandling(): Koa.Middleware<
   Koa.DefaultState,
   Koa.DefaultContext,
@@ -22,11 +27,24 @@ export function errorHandling(): Koa.Middleware<
           ctx.status = StatusCodes.UNPROCESSABLE_ENTITY;
         }
       } else if (error instanceof ValidateError) {
-        throw error;
+        ctx.status = StatusCodes.UNPROCESSABLE_ENTITY;
+        ctx.message = error.message;
+      } else if (hasHttpStatus(error)) {
+        ctx.status = error.status;
+        ctx.message = error.message ?? ctx.message;
       } else {
         ctx.status = StatusCodes.INTERNAL_SERVER_ERROR;
         ctx.message = "Unhandled exception";
       }
     }
   };
+}
+
+function hasHttpStatus(error: unknown): error is HttpError & { status: number } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    typeof error.status === "number"
+  );
 }

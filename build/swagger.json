@@ -1,0 +1,199 @@
+{
+	"openapi": "3.0.0",
+	"components": {
+		"examples": {},
+		"headers": {},
+		"parameters": {},
+		"requestBodies": {},
+		"responses": {},
+		"schemas": {
+			"ThermostatStatus": {
+				"enum": [
+					"OFF",
+					"COOL",
+					"HEAT",
+					"IDLE",
+					"STOPPED"
+				],
+				"type": "string"
+			},
+			"ThermostatInfo": {
+				"properties": {
+					"sensorTemperature": {
+						"type": "number",
+						"format": "double"
+					},
+					"sensorHumidity": {
+						"type": "number",
+						"format": "double"
+					},
+					"targetTemperature": {
+						"type": "number",
+						"format": "double"
+					},
+					"temperatureUncertainty": {
+						"type": "number",
+						"format": "double"
+					},
+					"status": {
+						"$ref": "#/components/schemas/ThermostatStatus"
+					},
+					"lowestTemperature": {
+						"type": "number",
+						"format": "double"
+					},
+					"highestTemperature": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"sensorTemperature",
+					"sensorHumidity",
+					"targetTemperature",
+					"temperatureUncertainty",
+					"status",
+					"lowestTemperature",
+					"highestTemperature"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"UpdateTemperature": {
+				"properties": {
+					"temperature": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"temperature"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"Measurement": {
+				"properties": {
+					"humidity": {
+						"type": "number",
+						"format": "double"
+					},
+					"temperature": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"humidity",
+					"temperature"
+				],
+				"type": "object",
+				"additionalProperties": false
+			}
+		},
+		"securitySchemes": {}
+	},
+	"info": {
+		"title": "thermo-api",
+		"version": "0.1.0",
+		"contact": {}
+	},
+	"paths": {
+		"/v1/thermostat/temperature": {
+			"put": {
+				"operationId": "UpdateTemperature",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ThermostatInfo"
+								}
+							}
+						}
+					}
+				},
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/UpdateTemperature"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/v1/thermostat/info": {
+			"get": {
+				"operationId": "GetInfo",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ThermostatInfo"
+								}
+							}
+						}
+					}
+				},
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/v1/thermostat/enable": {
+			"put": {
+				"operationId": "Enable",
+				"responses": {
+					"204": {
+						"description": "No content"
+					}
+				},
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/v1/thermostat/disable": {
+			"put": {
+				"operationId": "Disable",
+				"responses": {
+					"204": {
+						"description": "No content"
+					}
+				},
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/v1/sensor": {
+			"get": {
+				"operationId": "GetMeasurement",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Measurement"
+								}
+							}
+						}
+					}
+				},
+				"security": [],
+				"parameters": []
+			}
+		}
+	},
+	"servers": [
+		{
+			"url": "/"
+		}
+	]
+}

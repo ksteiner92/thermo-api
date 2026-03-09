@@ -18,6 +18,7 @@ import {
   ThermostatStatus,
   UpdateSetpoints,
 } from "./api/model/ThermostatInfo";
+import type { ThermostatSnapshotMessage } from "./api/model/ThermostatWebSocketMessage";
 import { SensorClient } from "./client/sensor/SensorClient";
 import { Measurement } from "./client/sensor/SensorTypes";
 
@@ -126,6 +127,7 @@ export class ThermostatManager {
     });
     this.wss.on("connection", (ws: WebSocket): void => {
       ThermostatManager.LOGGER.info({ ws }, "New client connected");
+      void this.sendSnapshotToClient(ws);
       ws.on("close", () => {
         ThermostatManager.LOGGER.info({ ws }, "Client disconnected");
       });
@@ -162,6 +164,7 @@ export class ThermostatManager {
       this.scheduleUpdateThermostat();
       this.scheduleTemperatureController();
       this.scheduleWebSocketUpdate();
+      await this.broadcastSnapshot();
     } catch (error) {
       logger.error({ error }, "Initialization error");
       if (error instanceof ThermostatManagerError) {
@@ -177,6 +180,7 @@ export class ThermostatManager {
 
   public stop(): void {
     this.running = false;
+    void this.broadcastSnapshot();
   }
 
   private static formatTimestamp(timestamp: number): string {
@@ -271,6 +275,55 @@ export class ThermostatManager {
       encoding: "utf8",
       flag: "w",
     });
+    void this.broadcastSnapshot();
+  }
+
+  private async buildSnapshotMessage(): Promise<ThermostatSnapshotMessage> {
+    return {
+      type: "thermostat_snapshot",
+      payload: await this.getThermostatInfo(),
+    };
+  }
+
+  private async sendSnapshotToClient(ws: WebSocket): Promise<void> {
+    const logger = ThermostatManager.LOGGER.child({
+      fn: "sendSnapshotToClient",
+    });
+    try {
+      if (ws.readyState !== undefined && ws.readyState !== WebSocket.OPEN) {
+        logger.warn({ readyState: ws.readyState }, "Websocket not open");
+        return;
+      }
+      ws.send(JSON.stringify(await this.buildSnapshotMessage()));
+    } catch (error) {
+      logger.error({ error }, "Failed to send websocket snapshot");
+    }
+  }
+
+  private async broadcastSnapshot(): Promise<void> {
+    const logger = ThermostatManager.LOGGER.child({
+      fn: "broadcastSnapshot",
+    });
+    try {
+      const message = await this.buildSnapshotMessage();
+      const serialized = JSON.stringify(message);
+
+      this.wss.clients.forEach((client: WebSocket): void => {
+        try {
+          if (
+            client.readyState !== undefined &&
+            client.readyState !== WebSocket.OPEN
+          ) {
+            return;
+          }
+          client.send(serialized);
+        } catch (error) {
+          logger.error({ error }, "Failed to broadcast websocket snapshot");
+        }
+      });
+    } catch (error) {
+      logger.error({ error }, "Failed to build websocket snapshot");
+    }
   }
 
   private async updateThermostat(): Promise<void> {
@@ -285,6 +338,7 @@ export class ThermostatManager {
       this.device = await this.daikinClient.getDevice(this.deviceId ?? "");
       logger.info({ device: this.device }, "Thermostat updated");
       this.lastDeviceUpdateTimestamp = Date.now();
+      await this.broadcastSnapshot();
     } catch (error) {
       logger.error("Error updating thermostat");
       throw error;
@@ -511,6 +565,7 @@ export class ThermostatManager {
         },
         "Received temperature",
       );
+      await this.broadcastSnapshot();
       if (this.sensorPollFailureCount >= this.errorAfterNumSensorPollFailures) {
         await this.start();
       }
@@ -554,11 +609,11 @@ export class ThermostatManager {
         return;
       }
       if (this.lastMeasurement.temperature > this.state.coolSetpoint) {
-        return this.cool(this.device, this.lastMeasurement.temperature);
+        await this.cool(this.device, this.lastMeasurement.temperature);
       } else if (this.lastMeasurement.temperature < this.state.heatSetpoint) {
-        return this.heat(this.device, this.lastMeasurement.temperature);
+        await this.heat(this.device, this.lastMeasurement.temperature);
       } else {
-        return this.idle(this.device, this.lastMeasurement.temperature);
+        await this.idle(this.device, this.lastMeasurement.temperature);
       }
     } catch (error) {
       logger.error({ error }, "Error while controlling temperature");
@@ -574,7 +629,7 @@ export class ThermostatManager {
       this.pollSensorTaskId = setInterval(
         async (): Promise<void> => {
           try {
-            this.pollSensor();
+            await this.pollSensor();
           } catch (error) {
             logger.error({ error }, "Exception during polling sensor");
           }
@@ -595,7 +650,7 @@ export class ThermostatManager {
           try {
             this.wss.clients.forEach((client: WebSocket.WebSocket): void => {
               logger.info({ client }, "Updating client");
-              //client.send(data)
+              void this.sendSnapshotToClient(client);
             });
           } catch (error) {
             logger.error({ error }, "Exception websocket update");
@@ -647,7 +702,7 @@ export class ThermostatManager {
               "Received temperature",
             );
             if (this.running) {
-              this.controlTemperature();
+              await this.controlTemperature();
             }
           } catch (error) {
             logger.error({ error }, "Exception during temperature contoller");
