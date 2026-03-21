@@ -10,8 +10,10 @@ import type { Server } from "node:http";
 import "dotenv/config";
 import { RegisterRoutes } from "./api/routes";
 import { ThermostatManager } from "./ThermostatManager";
+import { SensorClient } from "./client/sensor/SensorClient";
 import { registerTypes } from "./ioc/Register";
 import { logger } from "./Logging";
+import { container } from "tsyringe";
 import { errorHandling } from "./api/ErrorHandling";
 
 export function createApp(): Koa {
@@ -34,6 +36,10 @@ export function startServer(app: Koa = createApp()): Server {
     logger.info(
       `🚀 Server is running on port http://localhost:${process.env.SERVER_PORT}/`,
     );
+    const sensorClient = container.resolve<SensorClient>("SensorClient");
+    sensorClient.initialize().catch((error: unknown) => {
+      logger.error({ error }, "Failed to initialize sensor client");
+    });
     const thermostatManager = ThermostatManager.getInstance();
     thermostatManager.start().catch((error: unknown) => {
       logger.error({ error }, "Failed to start thermostat manager");

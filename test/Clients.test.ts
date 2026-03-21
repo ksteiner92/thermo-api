@@ -1,6 +1,7 @@
+import { EventEmitter } from "node:events";
 import axios from "axios";
 import { StatusCodes } from "http-status-codes";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DaikinClient } from "../src/client/daikin/DaikinClient";
 import { DaikinError } from "../src/client/daikin/DaikinError";
 import {
@@ -10,7 +11,11 @@ import {
   type DeviceResponse,
   type Devices,
 } from "../src/client/daikin/DaikinTypes";
-import { SensorClient } from "../src/client/sensor/SensorClient";
+import {
+  buildSensorClientOptions,
+  SensorClient,
+  type SensorClientOptions,
+} from "../src/client/sensor/SensorClient";
 import { SensorError } from "../src/client/sensor/SensorError";
 
 vi.mock("axios-retry", () => ({
@@ -258,15 +263,119 @@ describe("DaikinClient", () => {
   });
 });
 
+class FakeMqttClient extends EventEmitter {
+  public readonly subscribe = vi.fn(
+    (_topic: string, callback?: (error?: Error | null) => void) => {
+      callback?.(this.subscribeError);
+    },
+  );
+  public subscribeError: Error | null = null;
+}
+
 describe("SensorClient", () => {
-  it("returns the sensor measurement on success", async () => {
-    const axiosInstance = {
-      get: vi.fn().mockResolvedValue({
-        data: { humidity: 40, temperature: 22 },
-        status: StatusCodes.OK,
+  const zigbeeOptions: SensorClientOptions = {
+    brokerUrl: "mqtt://broker:1883",
+    clientId: "thermo-api-test",
+    password: "secret",
+    source: "zigbee",
+    staleMs: 180000,
+    topic: "zigbee2mqtt/0x7c3e82d71df90000",
+    username: "homeassistant",
+  };
+  const picoOptions: SensorClientOptions = {
+    ...zigbeeOptions,
+    source: "pico",
+    topic: "home/pico-dht22-1/state",
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("builds Zigbee defaults from environment", () => {
+    expect(
+      buildSensorClientOptions({
+        MQTT_CLIENT_ID: "thermo-api-test",
+        MQTT_PASSWORD: "secret",
+        MQTT_USERNAME: "homeassistant",
       }),
-    };
-    const client = new SensorClient(axiosInstance as never);
+    ).toEqual({
+      brokerUrl: "mqtt://mosquitto:1883",
+      clientId: "thermo-api-test",
+      password: "secret",
+      source: "zigbee",
+      staleMs: 180000,
+      topic: "zigbee2mqtt/0x7c3e82d71df90000",
+      username: "homeassistant",
+    });
+  });
+
+  it("builds Pico overrides from environment", () => {
+    expect(
+      buildSensorClientOptions({
+        MQTT_CLIENT_ID: "thermo-api-test",
+        MQTT_HOST: "openproject.local",
+        MQTT_PASSWORD: "secret",
+        MQTT_PORT: "1884",
+        MQTT_SENSOR_SOURCE: "pico",
+        MQTT_USERNAME: "homeassistant",
+      }),
+    ).toEqual({
+      brokerUrl: "mqtt://openproject.local:1884",
+      clientId: "thermo-api-test",
+      password: "secret",
+      source: "pico",
+      staleMs: 180000,
+      topic: "home/pico-dht22-1/state",
+      username: "homeassistant",
+    });
+  });
+
+  it("connects with the configured MQTT options and subscribes once", async () => {
+    const mqttClient = new FakeMqttClient();
+    const mqttConnect = vi.fn().mockReturnValue(mqttClient);
+    const client = new SensorClient(zigbeeOptions, mqttConnect);
+
+    await client.initialize();
+    await client.initialize();
+
+    expect(mqttConnect).toHaveBeenCalledWith(zigbeeOptions.brokerUrl, {
+      clientId: zigbeeOptions.clientId,
+      password: zigbeeOptions.password,
+      reconnectPeriod: 5000,
+      username: zigbeeOptions.username,
+    });
+    expect(mqttClient.subscribe).toHaveBeenCalledOnce();
+    expect(mqttClient.subscribe).toHaveBeenCalledWith(
+      zigbeeOptions.topic,
+      expect.any(Function),
+    );
+  });
+
+  it("returns the latest valid Zigbee MQTT measurement", async () => {
+    const mqttClient = new FakeMqttClient();
+    const client = new SensorClient(
+      zigbeeOptions,
+      vi.fn().mockReturnValue(mqttClient),
+    );
+
+    mqttClient.emit(
+      "message",
+      zigbeeOptions.topic,
+      Buffer.from(
+        JSON.stringify({
+          battery: 95,
+          humidity: 40,
+          linkquality: 120,
+          temperature: 22,
+        }),
+      ),
+    );
 
     await expect(client.getMeasurement()).resolves.toEqual({
       humidity: 40,
@@ -274,16 +383,91 @@ describe("SensorClient", () => {
     });
   });
 
-  it("throws on non-200 sensor responses", async () => {
-    const axiosInstance = {
-      get: vi.fn().mockResolvedValue({
-        status: StatusCodes.NO_CONTENT,
-      }),
-    };
-    const client = new SensorClient(axiosInstance as never);
+  it("throws when no MQTT measurement has been received yet", async () => {
+    const mqttClient = new FakeMqttClient();
+    const client = new SensorClient(
+      zigbeeOptions,
+      vi.fn().mockReturnValue(mqttClient),
+    );
 
     await expect(client.getMeasurement()).rejects.toEqual(
       new SensorError("Could not get measurement"),
     );
+  });
+
+  it("returns the latest valid Pico MQTT measurement", async () => {
+    const mqttClient = new FakeMqttClient();
+    const client = new SensorClient(picoOptions, vi.fn().mockReturnValue(mqttClient));
+
+    mqttClient.emit(
+      "message",
+      picoOptions.topic,
+      Buffer.from(
+        JSON.stringify({ humidity: 45, temperature: 21, timestamp: 123 }),
+      ),
+    );
+
+    await expect(client.getMeasurement()).resolves.toEqual({
+      humidity: 45,
+      temperature: 21,
+    });
+  });
+
+  it("ignores malformed MQTT payloads and unrelated topics", async () => {
+    const mqttClient = new FakeMqttClient();
+    const client = new SensorClient(
+      zigbeeOptions,
+      vi.fn().mockReturnValue(mqttClient),
+    );
+
+    mqttClient.emit(
+      "message",
+      "home/other-topic",
+      Buffer.from(JSON.stringify({ humidity: 10, temperature: 10 })),
+    );
+    mqttClient.emit("message", zigbeeOptions.topic, Buffer.from("{bad json"));
+    mqttClient.emit(
+      "message",
+      zigbeeOptions.topic,
+      Buffer.from(JSON.stringify({ humidity: "bad", temperature: 22 })),
+    );
+
+    await expect(client.getMeasurement()).rejects.toEqual(
+      new SensorError("Could not get measurement"),
+    );
+  });
+
+  it("treats cached MQTT data as stale after the configured timeout", async () => {
+    const mqttClient = new FakeMqttClient();
+    const client = new SensorClient(
+      zigbeeOptions,
+      vi.fn().mockReturnValue(mqttClient),
+    );
+
+    mqttClient.emit(
+      "message",
+      zigbeeOptions.topic,
+      Buffer.from(JSON.stringify({ humidity: 40, temperature: 22 })),
+    );
+    vi.advanceTimersByTime(zigbeeOptions.staleMs + 1);
+
+    await expect(client.getMeasurement()).rejects.toEqual(
+      new SensorError("Could not get measurement"),
+    );
+  });
+
+  it("resubscribes after an initial subscribe failure and reconnect event", async () => {
+    const mqttClient = new FakeMqttClient();
+    mqttClient.subscribeError = new Error("subscribe failed");
+    const client = new SensorClient(
+      zigbeeOptions,
+      vi.fn().mockReturnValue(mqttClient),
+    );
+
+    await client.initialize();
+    mqttClient.subscribeError = null;
+    mqttClient.emit("connect");
+
+    expect(mqttClient.subscribe).toHaveBeenCalledTimes(2);
   });
 });

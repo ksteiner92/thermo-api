@@ -31,6 +31,15 @@ services:
       - SENSOR_POLL_INTERVAL_MS=30000
       # After which number of sensor poll failures the thermostat will put into error state and stop updating the thermostat.
       - ERROR_AFTER_NUM_SENSOR_POLL_FAILURES=5
+      # MQTT broker connection for the active sensor source
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=homeassistant
+      - MQTT_PASSWORD=
+      - MQTT_CLIENT_ID=thermo-api
+      - MQTT_SENSOR_SOURCE=zigbee
+      - MQTT_SENSOR_TOPIC=zigbee2mqtt/YOUR_SENSOR_FRIENDLY_NAME
+      - MQTT_SENSOR_STALE_MS=180000
       # The max staleness of the internal device object after which the manager will try to update the mode regardless
       - MAX_DEVICE_STALENESS_MS=300000
 

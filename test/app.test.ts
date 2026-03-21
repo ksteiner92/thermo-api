@@ -32,6 +32,7 @@ describe("controllers and app", () => {
   };
   const sensorClient = {
     getMeasurement: vi.fn(),
+    initialize: vi.fn(),
   };
 
   beforeEach(() => {
@@ -40,6 +41,7 @@ describe("controllers and app", () => {
     thermostatManager.stop.mockReset();
     thermostatManager.updateSetpoints.mockReset();
     sensorClient.getMeasurement.mockReset();
+    sensorClient.initialize.mockReset();
 
     thermostatManager.start.mockResolvedValue(undefined);
     thermostatManager.getThermostatInfo.mockResolvedValue(thermostatInfo);
@@ -47,6 +49,7 @@ describe("controllers and app", () => {
       humidity: 41,
       temperature: 21,
     });
+    sensorClient.initialize.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -110,6 +113,7 @@ describe("controllers and app", () => {
       callback?.();
       return fakeServer as never;
     }) as typeof app.listen);
+    container.registerInstance("SensorClient", sensorClient as never);
     container.registerInstance("ThermostatManager", thermostatManager as never);
 
     const server = startServer(app);
@@ -118,7 +122,35 @@ describe("controllers and app", () => {
 
     expect(listenSpy).toHaveBeenCalledWith(process.env.SERVER_PORT, expect.any(Function));
     expect(server).toBe(fakeServer);
+    expect(sensorClient.initialize).toHaveBeenCalledOnce();
     expect(thermostatManager.start).toHaveBeenCalledOnce();
+  });
+
+  it("logs sensor client startup failures instead of rejecting the listen callback", async () => {
+    const error = new Error("sensor startup failed");
+    sensorClient.initialize.mockRejectedValue(error);
+    const app = createApp();
+    vi.spyOn(app, "listen").mockImplementation(((
+      _port: string | undefined,
+      callback?: () => void,
+    ) => {
+      callback?.();
+      return { close: vi.fn() } as never;
+    }) as typeof app.listen);
+    container.registerInstance("SensorClient", sensorClient as never);
+    container.registerInstance("ThermostatManager", thermostatManager as never);
+    const logging = await import("../src/Logging");
+    const loggerSpy = vi
+      .spyOn(logging.logger, "error")
+      .mockImplementation(() => logging.logger as never);
+
+    startServer(app);
+    await Promise.resolve();
+
+    expect(loggerSpy).toHaveBeenCalledWith(
+      { error },
+      "Failed to initialize sensor client",
+    );
   });
 
   it("logs startup failures instead of rejecting the listen callback", async () => {
@@ -132,6 +164,7 @@ describe("controllers and app", () => {
       callback?.();
       return { close: vi.fn() } as never;
     }) as typeof app.listen);
+    container.registerInstance("SensorClient", sensorClient as never);
     container.registerInstance("ThermostatManager", thermostatManager as never);
     const logging = await import("../src/Logging");
     const loggerSpy = vi
