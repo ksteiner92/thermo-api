@@ -3,3 +3,4 @@ package-lock.json
 docker-compose.yml
 node_modules/
 dist/
+coverage/
